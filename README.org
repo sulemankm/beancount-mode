@@ -81,3 +81,15 @@ the Emacs manual for more details.
 The =etc/emacsrc= file contains some example configuration for
 =beancount-mode= and some experiments that may find their way into the
 main codebase.
+
+* Collecting account names from multiple files
+
+In order to collect account names from multiple .bean files stored in a specific folder, while entering transactions, put the following in your emacs init file.
+This is helpful in a setup where you want to split your ledger/accounts files into multiple files.
+
+#+begin_src elisp
+(setq beancount-accounts-files
+  (directory-files "~/path/to/your/accounts/folder/"
+      'full
+      (rx ".bean" eos)))
+#+end_src
