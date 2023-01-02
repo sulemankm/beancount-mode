@@ -45,7 +45,7 @@
   :type 'integer)
 
 (defcustom beancount-number-alignment-column 52
-  "Column to which align numbers in postinng definitions. Set to
+  "Column to which align numbers in posting definitions. Set to
 0 to automatically determine the minimum column that will allow
 to align all amounts."
   :type 'integer)
@@ -907,10 +907,16 @@ Only useful if you have not installed Beancount properly in your PATH.")
                     (file-relative-name buffer-file-name)
                     (number-to-string (line-number-at-pos)))))
 
+;; There is no length limit for links but it seems reasonable to
+;; limit the search for the link to the 128 characters before and
+;; after the point. This number is chosen arbitrarily.
+(defun beancount--bounds-of-account-at-point ()
+  (when (thing-at-point-looking-at beancount-account-regexp 128)
+    (cons (match-beginning 0) (match-end 0))))
+
+(put 'beancount-account 'bounds-of-thing-at-point #'beancount--bounds-of-account-at-point)
+
 (defun beancount--bounds-of-link-at-point ()
-  ;; There is no length limit for links but it seems reasonable to
-  ;; limit the search for the link to the 128 characters before and
-  ;; after the point. This number is chosen arbitrarily.
   (when (thing-at-point-looking-at (concat "\\^[" beancount-tag-chars "]+") 128)
     (cons (match-beginning 0) (match-end 0))))
 
@@ -931,34 +937,34 @@ Only useful if you have not installed Beancount properly in your PATH.")
                         buffer-file-name
                         (or link lnarg))))))
 
-(defun beancount-region (rmin rmax &optional command &rest args)
-  "Get the info from \"region\" from `beancount-doctor-program'."
+;; Note: Eventually we'd like to be able to honor some metadata in the file that
+;; would point to the top-level filename.
+(defun beancount-command-on-region (rmin rmax command)
+  "Run a command with a region as the final arguments."
   (when (use-region-p)
     (let* ((compilation-read-command nil)
            (region-command (or command "region"))
-           (args (append (list beancount-doctor-program
-                               region-command
-                               buffer-file-name)
-                         args
-                         (list (format "%d:%d"
+           (args (append command
+                         (list buffer-file-name
+                               (format "%d:%d"
                                        (line-number-at-pos rmin)
                                        (line-number-at-pos
                                         (if (= 0 (save-excursion (goto-char rmax) (current-column)))
-                                            (1- rmax) rmax)))))))
-      ;(message args)))
+                                            (1- rmax) rmax)))
+                               ))))
       (apply #'beancount--run args))))
 
 (defun beancount-region-default (rmin rmax)
   (interactive "r")
-  (beancount-region rmin rmax "region"))
+  (beancount-command-on-region rmin rmax (list beancount-doctor-program "region")))
 
 (defun beancount-region-value (rmin rmax)
   (interactive "r")
-  (beancount-region rmin rmax "region" "--conversion=value"))
+  (beancount-command-on-region rmin rmax (list beancount-doctor-program "region" "--conversion=value")))
 
 (defun beancount-region-cost (rmin rmax)
   (interactive "r")
-  (beancount-region rmin rmax "region" "--conversion=cost"))
+  (beancount-command-on-region rmin rmax (list beancount-doctor-program "region" "--conversion=cost")))
 
 (defvar beancount-price-program "bean-price"
   "Program to run the price fetching commands.")
@@ -969,7 +975,7 @@ Only useful if you have not installed Beancount properly in your PATH.")
   (call-process beancount-price-program nil t nil
                 (file-relative-name buffer-file-name)))
 
-;;; Transaction highligh
+;;; Transaction highlight.
 
 (defvar beancount-highlight-overlay (list))
 (make-variable-buffer-local 'beancount-highlight-overlay)
@@ -1125,6 +1131,7 @@ Essentially a much simplified version of `next-line'."
   (while (and (not (eobp))
               (get-char-property (1- (point)) 'invisible))
     (beginning-of-line 2)))
+
 
 ;;; Fava
 
